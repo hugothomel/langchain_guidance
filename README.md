@@ -1,30 +1,94 @@
-# Make a simple agent with Guidance and local LLMs
-The [Guidance](https://github.com/microsoft/guidance) is a tool for controlling LLM. It provides a good concept to build prompt templates. This repository shows you how to make a agent with Guidance. You can combine it with various LLMs in Huggingface. My [medium article](https://medium.com/@gartist/a-simple-agent-with-guidance-and-local-llm-c0865c97eaa9) for more explanation.
+Custom Guidance Server with LangChain Integration
 
-UPDATE: Added gradio UI.
 
-# Install
-Python packages:
-- [guidance](https://github.com/microsoft/guidance)
-- [GPTQ-for-LLaMa](https://github.com/oobabooga/GPTQ-for-LLaMa.git)
-- [langchain](https://github.com/hwchase17/langchain)
-- [gradio](https://github.com/gradio-app/gradio) (Only for web UI)
 
-Note: we only use langchain for build the `GoogleSerper` tool. The agent itself is built only by Guidance. Feel free to change/add/modify the tools with your goal.
-The GPTQ-for-LLaMa I used is the oobabooga's fork. You can install it with [this command](https://github.com/oobabooga/text-generation-webui/blob/main/docs/GPTQ-models-(4-bit-mode).md#step-1-install-gptq-for-llama).
+The project primarily focuses on integrating the Guidance and LangChain libraries to offer a solution for querying and understanding documentation with the help of AI. A Flask server is set up that utilizes Oobabooga, LangChain, and Chroma vector store for intelligent retrieval and responses.
 
-# Run
-There are two options: run a Gradio server with UI and run the notebook file.
 
-## Gradio server
-Please modify the `SERPER_API_KEY`, `MODEL_PATH`, `CHECKPOINT_PATH` in the app.py and run:
-```sh
-gradio app.py
-```
 
-## Notebook
-Please check the [notebook file]((https://github.com/QuangBK/localLLM_guidance/blob/main/demo_ReAct.ipynb)). You should have a free SERPER API KEY and a LLM model to run this.
-I use the [wizard-mega-13B-GPTQ](https://huggingface.co/TheBloke/wizard-mega-13B-GPTQ) model. Feel free to try others.
+Project Structure
 
-# Example
-![alt text](https://github.com/QuangBK/localLLM_guidance/blob/main/gradio.png?raw=true)
+yaml
+
+.
+├── constants.py: Defines constants used in the project
+├── server/
+│   ├── agent.py: Contains the CustomAgentGuidance class
+│   ├── model.py: Functions for loading models
+│   ├── oobabooga_llm.py: Contains the OobaboogaLLM class
+│   └── tools.py: Functions for loading and using custom tools
+└── main.py: The main server script
+
+constants.py
+
+This file defines several important constants used in the project. The constants defined include:
+
+    EMB_OPENAI_ADA: Specifies the embedding model name for OpenAI Ada.
+    EMB_INSTRUCTOR_XL: Specifies the embedding model name for Instructor XL.
+    LLM_OPENAI_GPT35: Specifies the language model name for OpenAI GPT-3.5.
+    OOBA: A string constant.
+    TEST_FILE: Specifies the path to a test file.
+    MODEL: Specifies the path to the custom model.
+
+These constants are used throughout the code, especially in tools.py where the tools are defined and loaded.
+Installation
+
+Before running the server, ensure the following Python libraries are installed:
+
+    Flask
+    Flask-CORS
+    nest_asyncio
+    dotenv
+    gradio
+    guidance
+    torch
+    LangChain
+    Chroma
+
+You can install the dependencies using pip:
+
+bash
+
+pip install -r requirements.txt
+
+
+Make also sure you have text-generation-webui running in the background with arguments as such: python server.py --listen --model your-model  --api  --verbose  --xformers  --no-stream
+
+
+Running the Server
+
+    Load the model using the '/load_model' POST endpoint. The model loads into memory on startup.
+    Load the tools using the '/load_tools' POST endpoint. It checks if the model is loaded before loading the tools.
+    Use the '/run_script' POST endpoint to run the script. It checks if the tools are loaded before running the script.
+
+To start the server, use the following command:
+
+python gdc_server.py
+
+This will start a Flask server listening on 0.0.0.0:5001.
+
+
+
+Customization
+
+The CustomAgentGuidance class is defined in the agent.py file. This class can be customized to provide different behaviors for guidance.
+
+In tools.py, a dictionary of tool functions can be loaded for use in the server. Each tool should be a function that takes an input and returns an output. The Chroma Search tool is provided as an example.
+
+The server script (gdc_server.py) is set up to load a custom model and toolset, and then provide guidance based on those. The loaded model and toolset can be customized as needed.
+
+
+
+Interconnection of Guidance and LangChain
+
+This project's key feature is the combination of the Guidance and LangChain libraries. It loads a model using the Guidance library and then uses LangChain to set up a document retrieval system.
+
+This system is based on a Chroma vector store, which indexes and retrieves documents using AI embeddings. This allows for complex queries to be run on large amounts of documentation, with the AI providing intelligent, context-based answers.
+
+The server offers a '/run_script' endpoint to make queries against this document retrieval system and obtain AI-guided responses.
+
+
+
+Known Issues
+
+If you encounter an issue where the event loop is already running, you can solve this problem by calling nest_asyncio.apply().

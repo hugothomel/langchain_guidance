@@ -1,20 +1,35 @@
-# import guidance
+# import the necessary libraries
+from dotenv import load_dotenv
+import os
+from chromadb.config import Settings
+
+# load the environment variables
+load_dotenv()
+
+# get the environment variables
+EMBEDDINGS_MODEL_NAME = os.getenv('EMBEDDINGS_MODEL')
+PERSIST_DIRECTORY = os.getenv('MEMORIES_PATH')
+CHROMA_SETTINGS = Settings(
+        chroma_db_impl='duckdb+parquet',
+        persist_directory=PERSIST_DIRECTORY,
+        anonymized_telemetry=False
+)
 
 valid_answers = ['Action', 'Final Answer']
-valid_tools = ['Google Search']
+valid_tools = ['Chroma Search']
 
 prompt_start_template = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
 
 ### Instruction:
 Answer the following questions as best you can. You have access to the following tools:
 
-Google Search: A wrapper around Google Search. Useful for when you need to answer questions about current events. The input is the question to search relavant information.
+Chroma Search: A wrapper around Chroma Search. Useful for when you need to answer questions about current events. The input is the question to search relavant information.
 
 Strictly use the following format:
 
 Question: the input question you must answer
 Thought: you should always think about what to do
-Action: the action to take, should be one of [Google Search]
+Action: the action to take, should be one of [Chroma Search]
 Action Input: the input to the action, should be a question.
 Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
@@ -24,15 +39,15 @@ Final Answer: the final answer to the original input question
 For examples:
 Question: How old is CEO of Microsoft wife?
 Thought: First, I need to find who is the CEO of Microsoft.
-Action: Google Search
+Action: Chroma Search
 Action Input: Who is the CEO of Microsoft?
 Observation: Satya Nadella is the CEO of Microsoft.
 Thought: Now, I should find out Satya Nadella's wife.
-Action: Google Search
+Action: Chroma Search
 Action Input: Who is Satya Nadella's wife?
 Observation: Satya Nadella's wife's name is Anupama Nadella.
 Thought: Then, I need to check Anupama Nadella's age.
-Action: Google Search
+Action: Chroma Search
 Action Input: How old is Anupama Nadella?
 Observation: Anupama Nadella's age is 50.
 Thought: I now know the final answer.
@@ -65,8 +80,13 @@ class CustomAgentGuidance:
         self.num_iter = num_iter
 
     def do_tool(self, tool_name, actInput):
-        return self.tools[tool_name](actInput)
-    
+        if tool_name == "Chroma Search":
+            # Call the Chroma Search function
+            print(self.tools[tool_name](actInput))
+            return self.tools[tool_name](actInput)
+        else:
+            return self.tools[tool_name](actInput)
+        
     def __call__(self, query):
         prompt_start = self.guidance(prompt_start_template)
         result_start = prompt_start(question=query, valid_answers=valid_answers)
