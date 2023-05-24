@@ -8,16 +8,6 @@ The project primarily focuses on integrating the Guidance and LangChain librarie
 
 Project Structure
 
-yaml
-
-.
-├── constants.py: Defines constants used in the project
-├── server/
-│   ├── agent.py: Contains the CustomAgentGuidance class
-│   ├── model.py: Functions for loading models
-│   ├── oobabooga_llm.py: Contains the OobaboogaLLM class
-│   └── tools.py: Functions for loading and using custom tools
-└── main.py: The main server script
 
 constants.py
 
