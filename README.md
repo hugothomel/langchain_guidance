@@ -1,4 +1,4 @@
-Custom Guidance Server with LangChain Integration
+# Custom Guidance Server with LangChain Integration
 
 
 
@@ -6,7 +6,7 @@ The project primarily focuses on integrating the Guidance and LangChain librarie
 
 
 
-Project Structure
+## Project Structure
 
 
 constants.py
@@ -45,7 +45,7 @@ pip install -r requirements.txt
 Make also sure you have text-generation-webui running in the background with arguments as such: python server.py --listen --model your-model  --api  --verbose  --xformers  --no-stream
 
 
-Running the Server
+## Running the Server
 
     Load the model using the '/load_model' POST endpoint. The model loads into memory on startup.
     Load the tools using the '/load_tools' POST endpoint. It checks if the model is loaded before loading the tools.
@@ -59,7 +59,7 @@ This will start a Flask server listening on 0.0.0.0:5001.
 
 
 
-Customization
+## Customization
 
 The CustomAgentGuidance class is defined in the agent.py file. This class can be customized to provide different behaviors for guidance.
 
@@ -69,7 +69,7 @@ The server script (gdc_server.py) is set up to load a custom model and toolset, 
 
 
 
-Interconnection of Guidance and LangChain
+## Interconnection of Guidance and LangChain
 
 This project's key feature is the combination of the Guidance and LangChain libraries. It loads a model using the Guidance library and then uses LangChain to set up a document retrieval system.
 
@@ -79,6 +79,6 @@ The server offers a '/run_script' endpoint to make queries against this document
 
 
 
-Known Issues
+## Known Issues
 
 If you encounter an issue where the event loop is already running, you can solve this problem by calling nest_asyncio.apply().
