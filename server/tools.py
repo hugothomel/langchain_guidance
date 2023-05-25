@@ -52,7 +52,7 @@ def load_tools(llm_model):
     def searchChroma(key_word):
         hf_llm = OobaboogaLLM()   
         qa = RetrievalQA.from_chain_type(llm=hf_llm, chain_type="stuff",\
-                                        retriever=retriever, return_source_documents=True)
+                                        retriever=retriever, return_source_documents=False)
         
         print(qa)
         res=qa.run(key_word)
