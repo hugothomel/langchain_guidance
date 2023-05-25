@@ -7,6 +7,8 @@ from chromadb.config import Settings
 load_dotenv()
 
 # get the environment variables
+TEST_FILE = os.getenv("TEST_FILE")
+
 EMBEDDINGS_MODEL_NAME = os.getenv('EMBEDDINGS_MODEL')
 PERSIST_DIRECTORY = os.getenv('MEMORIES_PATH')
 CHROMA_SETTINGS = Settings(
