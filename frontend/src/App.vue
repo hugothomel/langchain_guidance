@@ -4,6 +4,7 @@
     <div class="button-container">
       <button class="btn" @click="loadModel">Load Model</button>
       <button class="btn" @click="loadTools">Load Tools</button>
+      <button class="btn" @click="reloadModules">Reload Modules</button>
     </div>
     <div class="form-group">
       <input class="form-input" v-model="question" placeholder="Enter a question here..." />
@@ -35,6 +36,11 @@ export default {
     async loadTools() {
       await axios.post('http://localhost:5001/load_tools');
     },
+
+    async reloadModules() {
+      await axios.post('http://localhost:5001/reload_modules');
+    },
+
     async submitQuestion() {
   const response = await axios.post('http://localhost:5001/run_script', { question: this.question });
   const responseData = response.data;
