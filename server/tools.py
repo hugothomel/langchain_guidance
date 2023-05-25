@@ -19,6 +19,7 @@ EMB_INSTRUCTOR_XL = os.getenv("EMBEDDINGS_MODEL")
 
 CHROMA_SETTINGS = {}  # Set your Chroma settings here
 def load_tools(llm_model):
+    
     def ingest_file(file_path):
         # Load text file
         with open(file_path, 'r') as file:

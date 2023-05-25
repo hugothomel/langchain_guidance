@@ -2,6 +2,7 @@
 from dotenv import load_dotenv
 import os
 from chromadb.config import Settings
+from colorama import Fore, Style
 
 # load the environment variables
 load_dotenv()
@@ -83,12 +84,15 @@ class CustomAgentGuidance:
 
     def do_tool(self, tool_name, actInput):
         if tool_name == "Chroma Search":
-            # Call the Chroma Search function
-            print(self.tools[tool_name](actInput))
-            return self.tools[tool_name](actInput)
+        # Call the Chroma Search function
+            print(Fore.GREEN + Style.BRIGHT + "Using tool: Chroma Search" + Style.RESET_ALL)
+            result = self.tools[tool_name](actInput)
+            print(result)
+            return result
         else:
+            print(Fore.GREEN + Style.BRIGHT + f"Using tool: {tool_name}" + Style.RESET_ALL)
             return self.tools[tool_name](actInput)
-        
+            
     def __call__(self, query):
         prompt_start = self.guidance(prompt_start_template)
         result_start = prompt_start(question=query, valid_answers=valid_answers)
