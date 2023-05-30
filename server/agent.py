@@ -18,21 +18,23 @@ CHROMA_SETTINGS = Settings(
         anonymized_telemetry=False
 )
 
-valid_answers = ['Action', 'Final Answer']
-valid_tools = ['Chroma Search']
+valid_answers = ['Action', 'Final Answer', 'Failed Check']
+valid_tools = ['Chroma Search', 'Check Question']
 
 prompt_start_template = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
 
 ### Instruction:
 Answer the following questions as best you can. You have access to the following tools:
 
-Chroma Search: A wrapper around Chroma Search. Useful for when you need to answer questions about current events. The input is the question to search relavant information.
+Check Question: A tool to validate if a question is answerable or not. The input is the question to validate.
+
+Chroma Search: A wrapper around Chroma Search. Useful for when you need to answer questions about current events. The input is the question to search relevant information.
 
 Strictly use the following format:
 
 Question: the input question you must answer
 Thought: you should always think about what to do
-Action: the action to take, should be one of [Chroma Search]
+Action: the action to take, should be one of [Check Question, Chroma Search]
 Action Input: the input to the action, should be a question.
 Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
@@ -40,8 +42,12 @@ Thought: I now know the final answer
 Final Answer: the final answer to the original input question
 
 For examples:
-Question: How old is CEO of Microsoft wife?
-Thought: First, I need to find who is the CEO of Microsoft.
+Question: How old is the CEO of Microsoft's wife?
+Thought: First, I need to check if the question is answerable.
+Action: Check Question
+Action Input: How old is the CEO of Microsoft's wife?
+Observation: The question is answerable.
+Thought: Now, I need to find who is the CEO of Microsoft.
 Action: Chroma Search
 Action Input: Who is the CEO of Microsoft?
 Observation: Satya Nadella is the CEO of Microsoft.
@@ -83,34 +89,39 @@ class CustomAgentGuidance:
         self.num_iter = num_iter
 
     def do_tool(self, tool_name, actInput):
-        if tool_name == "Chroma Search":
-        # Call the Chroma Search function
-            print(Fore.GREEN + Style.BRIGHT + "Using tool: Chroma Search" + Style.RESET_ALL)
-            result = self.tools[tool_name](actInput)
-            print(result)
-            return result
-        else:
-            print(Fore.GREEN + Style.BRIGHT + f"Using tool: {tool_name}" + Style.RESET_ALL)
-            return self.tools[tool_name](actInput)
+        print(Fore.GREEN + Style.BRIGHT + f"Using tool: {tool_name}" + Style.RESET_ALL)
+        result = self.tools[tool_name](actInput)
+        print(result)
+        return result
             
     def __call__(self, query):
         prompt_start = self.guidance(prompt_start_template)
         result_start = prompt_start(question=query, valid_answers=valid_answers)
-
         result_mid = result_start
-        
+
         for _ in range(self.num_iter - 1):
             if result_mid['answer'] == 'Final Answer':
                 break
             history = result_mid.__str__()
             prompt_mid = self.guidance(prompt_mid_template)
             result_mid = prompt_mid(history=history, do_tool=self.do_tool, valid_answers=valid_answers, valid_tools=valid_tools)
-        if result_mid['answer'] != 'Final Answer':
+            print(Fore.YELLOW + Style.BRIGHT + str(result_mid) + Style.RESET_ALL)
+            if "Observation:  No" in str(result_mid):
+                print(Fore.RED + Style.BRIGHT + f"I don't know" + Style.RESET_ALL)
+                break
+            
+        if "Observation:  No" in str(result_mid):
+            result_final = "I cannot answer this question given the context"
+            #result_final = prompt_mid(history="I cannot answer this question given the context", do_tool=self.do_tool, valid_answers=['Final Answer'], valid_tools=valid_tools)
+
+        elif result_mid['answer'] != 'Final Answer':
             history = result_mid.__str__()
             prompt_mid = self.guidance(prompt_final_template)
             result_final = prompt_mid(history=history, do_tool=self.do_tool, valid_answers=['Final Answer'], valid_tools=valid_tools)
+
         else:
             history = result_mid.__str__()
             prompt_mid = self.guidance(history + "{{gen 'fn' stop='\\n'}}")
             result_final = prompt_mid()
+
         return result_final

@@ -1,4 +1,6 @@
 from importlib import reload
+import sacremoses
+from transformers import FlaubertModel, FlaubertTokenizer
 import server.tools
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,7 +64,12 @@ async def run_script(question: Question = Body(...)):
         return {'message': 'Tools are not loaded. Load the tools first', 'status_code': 400}
     custom_agent = CustomAgentGuidance(guidance, dict_tools)
     final_answer = custom_agent(question.question)
-    return {'answer': str(final_answer), 'function': str(final_answer['fn'])}
+    if isinstance(final_answer, dict):
+        return {'answer': str(final_answer), 'function': str(final_answer['fn'])}
+    else:
+        # Handle the case when final_answer is not a dictionary.
+        return {'answer': str(final_answer)}
+
 
 @app.post('/reload_modules')
 async def reload_modules():

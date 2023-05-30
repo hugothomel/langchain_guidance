@@ -25,14 +25,6 @@ EMBEDDINGS_MAP = {
 
 CHROMA_SETTINGS = {}  # Set your Chroma settings here
 
-QUESTION_CHECK_PROMPT_TEMPLATE = """The context is:
-
-{}
-
-Based on this context, the question is: {}
-
-Can this question be answered with the given context?"""
-
 def clean_text(text):
     # Remove line breaks
     text = text.replace('\n', ' ')
@@ -116,11 +108,11 @@ def load_tools(llm_model):
 
     def searchChroma(key_word):
     # First, check if the question can be answered with the given context
-        check_result = checkQuestion(key_word, retriever)
-        print(Fore.GREEN + Style.BRIGHT + check_result + Style.RESET_ALL)
-        if check_result.lower() != "yes":
-            print("The question cannot be answered with the given context.")
-            return
+        #check_result = checkQuestion(key_word, retriever)
+        #print(Fore.GREEN + Style.BRIGHT + check_result + Style.RESET_ALL)
+        #if check_result.lower() != "yes":
+        #    print("The question cannot be answered with the given context.")
+        #    return
 
         hf_llm = OobaboogaLLM()  # Initialize your LLM
         qa = RetrievalQA.from_chain_type(llm=hf_llm, chain_type="stuff", retriever=retriever, return_source_documents=False)
@@ -133,7 +125,7 @@ def load_tools(llm_model):
     dict_tools = {
         'Chroma Search': searchChroma,
         'File Ingestion': ingest_file,
-        'Check Question': checkQuestion,
+        'Check Question': lambda question: checkQuestion(question, retriever),
     }
 
     return dict_tools

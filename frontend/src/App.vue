@@ -4,6 +4,8 @@
     <div class="button-container">
       <button class="btn" @click="loadModel">Load Model</button>
       <button class="btn" @click="loadTools">Load Tools</button>
+      <!-- Reload Modules Button -->
+      <button class="btn" @click="reloadModules">Reload Modules</button>
     </div>
     <div class="form-group">
       <input class="form-input" v-model="question" placeholder="Enter a question here..." />
@@ -29,11 +31,21 @@ export default {
     };
   },
   methods: {
-    async loadModel() {
-      // Your existing method here
-    },
+     async loadModel() {
+  try {
+    const response = await axios.post('http://localhost:5001/load_model');
+    console.log(response.data); // you can handle the response as needed
+  } catch (error) {
+    console.error(error);
+  }
+},
     async loadTools() {
-      // Your existing method here
+      try {
+        const response = await axios.post('http://localhost:5001/load_tools');
+        console.log(response.data); // you can handle the response as needed
+      } catch (error) {
+        console.error(error);
+      }
     },
     async submitQuestion() {
       try {
@@ -62,6 +74,14 @@ export default {
           finalAnswer: finalAnswer,
           reasoning: reasoningData
         };
+      } catch (error) {
+        console.error(error);
+      }
+    },
+    async reloadModules() {
+      try {
+        const response = await axios.post('http://localhost:5001/reload_modules');
+        console.log(response.data); // handle the response as needed
       } catch (error) {
         console.error(error);
       }
