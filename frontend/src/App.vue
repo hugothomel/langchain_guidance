@@ -4,7 +4,6 @@
     <div class="button-container">
       <button class="btn" @click="loadModel">Load Model</button>
       <button class="btn" @click="loadTools">Load Tools</button>
-      <button class="btn" @click="reloadModules">Reload Modules</button>
     </div>
     <div class="form-group">
       <input class="form-input" v-model="question" placeholder="Enter a question here..." />
@@ -31,47 +30,42 @@ export default {
   },
   methods: {
     async loadModel() {
-      await axios.post('http://localhost:5001/load_model');
+      // Your existing method here
     },
     async loadTools() {
-      await axios.post('http://localhost:5001/load_tools');
+      // Your existing method here
     },
-
-    async reloadModules() {
-      await axios.post('http://localhost:5001/reload_modules');
-    },
-
     async submitQuestion() {
-  const response = await axios.post('http://localhost:5001/run_script', { question: this.question });
-  const responseData = response.data;
+      try {
+        const response = await axios.post('http://localhost:5001/run_script', { question: this.question });
+        let responseData = response.data.answer;
 
-  const startString = "Final Answer: Anupama Nadella is 50 years old.";
-  const startStringIndex = responseData.indexOf(startString);
-  
-  // We add the length of startString to get the index immediately after it
-  let reasoningData = responseData.slice(startStringIndex + startString.length);
-  
-  // Now we want to remove the final answer from reasoningData
-  const splitData = reasoningData.split("Final Answer:");
-  let finalAnswer = "No final answer found.";
+        const startString = "Anupama Nadella is 50 years old.";
+        const startStringIndex = responseData.indexOf(startString);
+        
+        // We add the length of startString to get the index immediately after it
+        let reasoningData = responseData.slice(startStringIndex + startString.length);
 
-  // Check if there are at least 3 instances of "Final Answer:"
-  if (splitData.length >= 2) {
-    // The second instance is at index 1 because array indices start at 0
-    finalAnswer = splitData[1].trim();
-    // Remove final answer from reasoningData
-    reasoningData = splitData[0].trim();
-  }
+        // Now we want to remove the final answer from reasoningData
+        const splitData = reasoningData.split("Final Answer:");
+        let finalAnswer = "No final answer found.";
 
-  this.answer = {
-    finalAnswer: finalAnswer,
-    reasoning: reasoningData
-  };
-}
+        // Check if there are at least 3 instances of "Final Answer:"
+        if (splitData.length >= 2) {
+          // The second instance is at index 1 because array indices start at 0
+          finalAnswer = splitData[1].trim();
+          // Remove final answer from reasoningData
+          reasoningData = splitData[0].trim();
+        }
 
-
-
-
+        this.answer = {
+          finalAnswer: finalAnswer,
+          reasoning: reasoningData
+        };
+      } catch (error) {
+        console.error(error);
+      }
+    },
   },
 };
 </script>
@@ -145,3 +139,4 @@ export default {
   margin-bottom: 20px;
 }
 </style>
+

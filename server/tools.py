@@ -28,7 +28,7 @@ def load_tools(llm_model):
         # Use filename as title
         title = os.path.basename(file_path)
         docs = {title: text}
-        embedding = HuggingFaceInstructEmbeddings(model_name=EMB_INSTRUCTOR_XL, model_kwargs={"device": "cuda:2"})
+        embedding = HuggingFaceInstructEmbeddings(model_name=EMB_INSTRUCTOR_XL, model_kwargs={"device": "cuda:0"})
         
         documents = [Document(page_content=docs[title]) for title in docs]
         # Split by section, then split by token limit
@@ -50,7 +50,7 @@ def load_tools(llm_model):
     retriever, title = ingest_file(file_path)
 
     def searchChroma(key_word):
-        hf_llm = OobaboogaLLM()   
+        hf_llm = OobaboogaLLM()  
         qa = RetrievalQA.from_chain_type(llm=hf_llm, chain_type="stuff",\
                                         retriever=retriever, return_source_documents=False)
         

@@ -1,63 +1,71 @@
 from importlib import reload
 import server.tools
-from flask import Flask, request, jsonify
-from flask_cors import CORS, cross_origin
+from fastapi import FastAPI, Body
+from fastapi.middleware.cors import CORSMiddleware
 from constants import *
-import nest_asyncio
 import guidance
 import torch
 from server.model import load_model_main
 from server.tools import load_tools
 from server.agent import CustomAgentGuidance
+from pydantic import BaseModel
+from typing import Optional
 import os
 from langchain.llms import OpenAI
 from colorama import Fore, Style
+import uvicorn
+import nest_asyncio
+import asyncio
+class Question(BaseModel):
+    question: Optional[str] = 'Who is the main character?'
 
-app = Flask(__name__)
-CORS(app)
-
+app = FastAPI()
 nest_asyncio.apply()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
 MODEL_PATH = MODEL
 DEVICE = torch.device('cuda:0')
 
 llama = None
 dict_tools = None
 
-@app.route('/load_model', methods=['POST'])
-@cross_origin()
-def load_model():
+@app.post('/load_model')
+async def load_model():
     print(Fore.GREEN + Style.BRIGHT + f"Loading model...." + Style.RESET_ALL)
     global llama
     llama = guidance.llms.Transformers(MODEL_PATH, device_map="auto", load_in_8bit=True)
     guidance.llm = llama
     return 'Model loaded successfully'
 
-@app.route('/load_tools', methods=['POST'])
-@cross_origin()
-def load_tools_route():
+@app.post('/load_tools')
+async def load_tools_route():
     global dict_tools
     # Reload the tools module to get the latest version
     reload(server.tools)
     
     if llama is None:
-        return 'Model is not loaded. Load the model first', 400
+        return {'message': 'Model is not loaded. Load the model first', 'status_code': 400}
     dict_tools = load_tools(llama)
     return 'Tools loaded successfully' 
 
-@app.route('/run_script', methods=['POST'])
-@cross_origin()
-def run_script():
+@app.post('/run_script')
+async def run_script(question: Question = Body(...)):
     global dict_tools
     if dict_tools is None:
-        return 'Tools are not loaded. Load the tools first', 400
-    question = request.json.get('question', 'Who is the main character?')
+        return {'message': 'Tools are not loaded. Load the tools first', 'status_code': 400}
     custom_agent = CustomAgentGuidance(guidance, dict_tools)
-    final_answer = custom_agent(question)
-    return str(final_answer), str(final_answer['fn'])
+    final_answer = custom_agent(question.question)
+    return {'answer': str(final_answer), 'function': str(final_answer['fn'])}
 
-@app.route('/reload_modules', methods=['POST'])
-@cross_origin()
-def reload_modules():
+@app.post('/reload_modules')
+async def reload_modules():
     global server
     # Reload the modules
     server.tools = reload(server.tools)
@@ -71,5 +79,10 @@ def reload_modules():
     print(Fore.GREEN + Style.BRIGHT + f"Modules reloaded successfully" + Style.RESET_ALL)
     return 'Modules reloaded successfully'
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=False)
+if __name__ == "__main__":
+    from hypercorn.config import Config
+    from hypercorn.asyncio import serve
+
+    config = Config()
+    config.bind = ["0.0.0.0:5001"]  # adjust to your needs
+    asyncio.run(serve(app, config))
