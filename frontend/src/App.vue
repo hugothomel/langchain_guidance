@@ -33,7 +33,7 @@ export default {
   methods: {
      async loadModel() {
   try {
-    const response = await axios.post('http://localhost:5001/load_model');
+    const response = await axios.post('http://localhost:5002/load_model');
     console.log(response.data); // you can handle the response as needed
   } catch (error) {
     console.error(error);
@@ -41,7 +41,7 @@ export default {
 },
     async loadTools() {
       try {
-        const response = await axios.post('http://localhost:5001/load_tools');
+        const response = await axios.post('http://localhost:5002/load_tools');
         console.log(response.data); // you can handle the response as needed
       } catch (error) {
         console.error(error);
@@ -49,7 +49,7 @@ export default {
     },
     async submitQuestion() {
       try {
-        const response = await axios.post('http://localhost:5001/run_script', { question: this.question });
+        const response = await axios.post('http://localhost:5002/run_script', { question: this.question });
         let responseData = response.data.answer;
 
         const startString = "Anupama Nadella is 50 years old.";
@@ -80,7 +80,7 @@ export default {
     },
     async reloadModules() {
       try {
-        const response = await axios.post('http://localhost:5001/reload_modules');
+        const response = await axios.post('http://localhost:5002/reload_modules');
         console.log(response.data); // handle the response as needed
       } catch (error) {
         console.error(error);

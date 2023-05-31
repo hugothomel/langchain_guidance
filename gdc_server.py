@@ -49,13 +49,13 @@ async def load_model():
 @app.post('/load_tools')
 async def load_tools_route():
     global dict_tools
-    # Reload the tools module to get the latest version
     reload(server.tools)
     
     if llama is None:
         return {'message': 'Model is not loaded. Load the model first', 'status_code': 400}
-    dict_tools = load_tools(llama)
-    return 'Tools loaded successfully' 
+    dict_tools = load_tools(llama)  # Pass llama as parameter to load_tools
+    return 'Tools loaded successfully'
+
 
 @app.post('/run_script')
 async def run_script(question: Question = Body(...)):
@@ -91,5 +91,5 @@ if __name__ == "__main__":
     from hypercorn.asyncio import serve
 
     config = Config()
-    config.bind = ["0.0.0.0:5001"]  # adjust to your needs
+    config.bind = ["0.0.0.0:5002"]  # adjust to your needs
     asyncio.run(serve(app, config))

@@ -12,7 +12,7 @@ from langchain.llms import OpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 from constants import *
 import os
-
+from transformers import pipeline
 load_dotenv()
 
 TEST_FILE = os.getenv("TEST_FILE")
@@ -44,13 +44,18 @@ def split_documents(documents: list[Document], chunk_size: int = 100, chunk_over
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     return text_splitter.split_documents(documents)
 
-def checkQuestion(question: str, retriever):
+def checkQuestion(question: str, retriever, llm_model):
     QUESTION_CHECK_PROMPT_TEMPLATE = """You MUST answer with 'yes' or 'no'. Given the following pieces of context, determine if there are any elements related to the question in the context.
 Don't forget you MUST answer with 'yes' or 'no'.
 Context:{context}
 Question: Are there any elements related to ""{question}"" in the context?
 """
-    llm = OobaboogaLLM()  # Initialize the LLM you use
+    llm_pipe = pipeline(
+        task="text2text-generation",
+        model='google/flan-t5-xl',
+        model_kwargs={}
+    )
+    llm = HuggingFacePipeline(pipeline=llm_pipe)
     qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever, return_source_documents=True)
 
     # Answer the question
@@ -70,7 +75,7 @@ Question: Are there any elements related to ""{question}"" in the context?
     question_check_prompt = QUESTION_CHECK_PROMPT_TEMPLATE.format(context=context, question=question)
     print(Fore.GREEN + Style.BRIGHT + question_check_prompt + Style.RESET_ALL)
     # Submit the prompt to the LLM directly
-    answerable = llm.call_api(question_check_prompt)
+    answerable = llm(question_check_prompt)
     print(Fore.GREEN + Style.BRIGHT + answerable + Style.RESET_ALL)
     return answerable[-3:]
 
@@ -125,7 +130,7 @@ def load_tools(llm_model):
     dict_tools = {
         'Chroma Search': searchChroma,
         'File Ingestion': ingest_file,
-        'Check Question': lambda question: checkQuestion(question, retriever),
+        'Check Question': lambda question: checkQuestion(question, retriever, llm_model),
     }
 
     return dict_tools
