@@ -72,7 +72,11 @@ Question: Are there any elements related to ""{question}"" in the context?
     # Submit the prompt to the LLM directly
     answerable = llm.call_api(question_check_prompt)
     print(Fore.GREEN + Style.BRIGHT + answerable + Style.RESET_ALL)
-    return answerable[-3:]
+    if "yes" in answerable.lower():
+        return "Yes"
+    else:
+        return " No"
+
 
 
 
