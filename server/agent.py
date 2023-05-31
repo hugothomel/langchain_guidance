@@ -111,7 +111,7 @@ class CustomAgentGuidance:
                 break
             
         if "Observation:  No" in str(result_mid):
-            result_final = "I cannot answer this question given the context"
+            result_final = "I can't say"
             #result_final = prompt_mid(history="I cannot answer this question given the context", do_tool=self.do_tool, valid_answers=['Final Answer'], valid_tools=valid_tools)
 
         elif result_mid['answer'] != 'Final Answer':
