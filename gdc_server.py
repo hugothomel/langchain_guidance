@@ -1,6 +1,4 @@
 from importlib import reload
-import sacremoses
-from transformers import FlaubertModel, FlaubertTokenizer
 import server.tools
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,13 +14,12 @@ import os
 from langchain.llms import OpenAI
 from colorama import Fore, Style
 import uvicorn
-import nest_asyncio
 import asyncio
+
 class Question(BaseModel):
     question: Optional[str] = 'Who is the main character?'
 
 app = FastAPI()
-nest_asyncio.apply()
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,7 +39,13 @@ dict_tools = None
 async def load_model():
     print(Fore.GREEN + Style.BRIGHT + f"Loading model...." + Style.RESET_ALL)
     global llama
-    llama = guidance.llms.Transformers(MODEL_PATH, device_map="auto", load_in_8bit=True)
+    llama = guidance.llms.LlamaCpp(
+    model = "/home/karajan/labzone/llama.cpp/models/guanaco/guanaco-7B.ggmlv3.q4_0.bin",
+    tokenizer="TheBloke/guanaco-7B-HF",
+    n_gpu_layers=500,
+    n_threads=12,
+    caching=False, 
+)
     guidance.llm = llama
     return 'Model loaded successfully'
 
@@ -62,6 +65,8 @@ async def run_script(question: Question = Body(...)):
     global dict_tools
     if dict_tools is None:
         return {'message': 'Tools are not loaded. Load the tools first', 'status_code': 400}
+    print(Fore.GREEN + Style.BRIGHT + str(question) + Style.RESET_ALL)
+    
     custom_agent = CustomAgentGuidance(guidance, dict_tools)
     final_answer = custom_agent(question.question)
     if isinstance(final_answer, dict):

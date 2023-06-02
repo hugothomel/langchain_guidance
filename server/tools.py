@@ -8,15 +8,22 @@ from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
 from langchain.text_splitter import CharacterTextSplitter, TokenTextSplitter, RecursiveCharacterTextSplitter
 from server.oobabooga_llm import OobaboogaLLM
-from langchain.llms import OpenAI
+from langchain.llms import LlamaCpp
 from langchain.embeddings.openai import OpenAIEmbeddings
 from constants import *
 import os
-
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 load_dotenv()
-
+model_type = os.environ.get('MODEL_TYPE')
+model_path = '/home/karajan/labzone/llama.cpp/models/guanaco/guanaco-7B.ggmlv3.q4_0.bin'
+model_n_ctx = '1000'
+target_source_chunks = '4'
+n_gpu_layers = '500'
+use_mlock = '0'
+n_batch = os.environ.get('N_BATCH') if os.environ.get('N_BATCH') != None else 512
+callbacks = []
 TEST_FILE = os.getenv("TEST_FILE")
-EMBEDDINGS_MODEL = os.getenv("EMBEDDINGS_MODEL")
+EMBEDDINGS_MODEL= os.getenv("EMBEDDINGS_MODEL")
 
 EMBEDDINGS_MAP = {
     **{name: HuggingFaceInstructEmbeddings for name in ["hkunlp/instructor-xl", "hkunlp/instructor-large"]},
@@ -44,13 +51,15 @@ def split_documents(documents: list[Document], chunk_size: int = 100, chunk_over
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     return text_splitter.split_documents(documents)
 
-def checkQuestion(question: str, retriever):
+def checkQuestion(question, retriever, llm):
     QUESTION_CHECK_PROMPT_TEMPLATE = """You MUST answer with 'yes' or 'no'. Given the following pieces of context, determine if there are any elements related to the question in the context.
 Don't forget you MUST answer with 'yes' or 'no'.
 Context:{context}
-Question: Are there any elements related to ""{question}"" in the context?
+Question: Are there any elements related to ""What's our address?"" in the context?
 """
-    llm = OobaboogaLLM()  # Initialize the LLM you use
+    llm = OobaboogaLLM()
+    # llm = LlamaCpp(model_path=model_path, n_ctx=model_n_ctx, callbacks=callbacks, verbose=False,n_gpu_layers=n_gpu_layers, use_mlock=use_mlock,top_p=0.9, n_batch=n_batch)
+    # Initialize the LLM you use
     qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever, return_source_documents=True)
 
     # Answer the question
@@ -70,7 +79,7 @@ Question: Are there any elements related to ""{question}"" in the context?
     question_check_prompt = QUESTION_CHECK_PROMPT_TEMPLATE.format(context=context, question=question)
     print(Fore.GREEN + Style.BRIGHT + question_check_prompt + Style.RESET_ALL)
     # Submit the prompt to the LLM directly
-    answerable = llm.call_api(question_check_prompt)
+    answerable = llm(question_check_prompt)
     print(Fore.GREEN + Style.BRIGHT + answerable + Style.RESET_ALL)
     if "yes" in answerable.lower():
         return "Yes"
@@ -82,6 +91,8 @@ Question: Are there any elements related to ""{question}"" in the context?
 
 
 def load_tools(llm_model):
+    llm = OobaboogaLLM()
+    #llm = LlamaCpp(model_path=model_path, n_ctx=model_n_ctx, callbacks=callbacks, verbose=False,n_gpu_layers=n_gpu_layers, use_mlock=use_mlock,top_p=0.9, n_batch=n_batch)
     def ingest_file(file_path):
         # Load unstructured document
         documents = load_unstructured_document(file_path)
@@ -110,26 +121,21 @@ def load_tools(llm_model):
     file_path = TEST_FILE
     retriever, title = ingest_file(file_path)
 
-    def searchChroma(key_word):
-    # First, check if the question can be answered with the given context
-        #check_result = checkQuestion(key_word, retriever)
-        #print(Fore.GREEN + Style.BRIGHT + check_result + Style.RESET_ALL)
-        #if check_result.lower() != "yes":
-        #    print("The question cannot be answered with the given context.")
-        #    return
-
-        hf_llm = OobaboogaLLM()  # Initialize your LLM
-        qa = RetrievalQA.from_chain_type(llm=hf_llm, chain_type="stuff", retriever=retriever, return_source_documents=False)
+    def searchChroma(key_word, retriever, llm):
+        qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever, return_source_documents=False)
 
         print(qa)
         res = qa.run(key_word)
         print(res)
         return res
 
+    file_path = TEST_FILE
+    retriever, title = ingest_file(file_path)
+
     dict_tools = {
-        'Chroma Search': searchChroma,
+        'Chroma Search': lambda key_word: searchChroma(key_word, retriever, llm),
         'File Ingestion': ingest_file,
-        'Check Question': lambda question: checkQuestion(question, retriever),
+        'Check Question': lambda question: checkQuestion(question, retriever, llm),
     }
 
     return dict_tools

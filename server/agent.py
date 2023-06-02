@@ -71,7 +71,7 @@ Thought: {{gen 't1' stop='\\n'}}
 {{select 'answer' logprobs='logprobs' options=valid_answers}}: """
 
 prompt_mid_template = """{{history}}{{select 'tool_name' options=valid_tools}}
-Action Input: {{gen 'actInput' stop='\\n'}}
+Action Input: {{gen 'actInput' stop='\\n' temperature=0}}
 Observation: {{do_tool tool_name actInput}}
 Thought: {{gen 'thought' stop='\\n'}}
 {{select 'answer' logprobs='logprobs' options=valid_answers}}: """
@@ -83,19 +83,25 @@ Thought: {{gen 'thought' stop='\\n'}}
 {{select 'answer' options=valid_answers}}: {{gen 'fn' stop='\\n'}}"""
 
 class CustomAgentGuidance:
-    def __init__(self, guidance, tools, num_iter=3):
+    def __init__(self, guidance, tools):
         self.guidance = guidance
         self.tools = tools
-        self.num_iter = num_iter
+        self.num_iter = 3
 
-    def do_tool(self, tool_name, actInput):
+    def do_tool(self, tool_name, question):
         print(Fore.GREEN + Style.BRIGHT + f"Using tool: {tool_name}" + Style.RESET_ALL)
-        result = self.tools[tool_name](actInput)
+        if tool_name == 'Check Question':
+            print(Fore.RED + Style.BRIGHT + f"QUESTION CHECK: " + str(question)+ Style.RESET_ALL)
+            result = self.tools[tool_name](question)
+        else:
+            result = self.tools[tool_name](actInput)
         print(result)
         return result
+
             
     def __call__(self, query):
         prompt_start = self.guidance(prompt_start_template)
+        """print(Fore.GREEN + Style.BRIGHT + str(prompt_start)+ Style.RESET_ALL)"""
         result_start = prompt_start(question=query, valid_answers=valid_answers)
         result_mid = result_start
 
@@ -104,7 +110,10 @@ class CustomAgentGuidance:
                 break
             history = result_mid.__str__()
             prompt_mid = self.guidance(prompt_mid_template)
-            result_mid = prompt_mid(history=history, do_tool=self.do_tool, valid_answers=valid_answers, valid_tools=valid_tools)
+
+            print(Fore.RED + Style.BRIGHT + str(query)+ Style.RESET_ALL)
+            
+            result_mid = prompt_mid(history=history, do_tool=self.do_tool, valid_answers=valid_answers, valid_tools=valid_tools, question=query)
             print(Fore.YELLOW + Style.BRIGHT + str(result_mid) + Style.RESET_ALL)
             if "Observation:  No" in str(result_mid):
                 print(Fore.RED + Style.BRIGHT + f"I don't know" + Style.RESET_ALL)
@@ -117,7 +126,7 @@ class CustomAgentGuidance:
         elif result_mid['answer'] != 'Final Answer':
             history = result_mid.__str__()
             prompt_mid = self.guidance(prompt_final_template)
-            result_final = prompt_mid(history=history, do_tool=self.do_tool, valid_answers=['Final Answer'], valid_tools=valid_tools)
+            result_final = prompt_mid(history=history, do_tool=self.do_tool, valid_answers=['Final Answer'], valid_tools=valid_tools, question=query)
 
         else:
             history = result_mid.__str__()
