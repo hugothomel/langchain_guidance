@@ -44,7 +44,9 @@ async def load_model():
     global llama
     llama = guidance.llms.LlamaCpp(
     model = MODEL_PATH,
-    tokenizer="TheBloke/guanaco-7B-HF",
+    tokenizer = "openaccess-ai-collective/manticore-13b-chat-pyg",
+    before_role = "<|",
+    after_role = "|>",
     n_gpu_layers=300,
     n_threads=12,
     caching=False, )
