@@ -25,11 +25,11 @@ EMBEDDINGS_MAP = {
 }
 
 model_type = os.environ.get('MODEL_TYPE')
-model_path = '/home/karajan/labzone/llama.cpp/models/guanaco/guanaco-7B.ggmlv3.q8_0.bin'
-model_n_ctx = '1000'
-target_source_chunks = '4'
-n_gpu_layers = '500'
-use_mlock = '0'
+model_path = os.environ.get('MODEL_PATH')
+model_n_ctx =1000
+target_source_chunks = os.environ.get('TARGET_SOURCE_CHUNKS')
+n_gpu_layers = os.environ.get('N_GPU_LAYERS')
+use_mlock = os.environ.get('USE_MLOCK')
 n_batch = os.environ.get('N_BATCH') if os.environ.get('N_BATCH') != None else 512
 callbacks = []
 qa_prompt = ""
@@ -58,8 +58,8 @@ def split_documents(documents: list[Document], chunk_size: int = 500, chunk_over
 
 def checkQuestion(question: str, retriever, llm):
     global qa_prompt
-    QUESTION_CHECK_PROMPT_TEMPLATE = """### Human: You MUST answer with 'yes' or 'no'. Given the following pieces of context, determine if there are any elements related to the question in the context.
-Don't forget you MUST answer with 'yes' or 'no'.
+    QUESTION_CHECK_PROMPT_TEMPLATE = """### Human: You are an AI assistant who uses document information to answer questions. You MUST answer with 'yes' or 'no'. Given the following pieces of context, determine if there are any elements related to the question in the context.
+Don't forget you MUST answer with 'yes' or 'no'. To assist me in this task, you have access to a vector database context that contains various documents related to different topics.
 Context:{context}
 Question: Is there any info related to ""{question}"" in the context? Yes or no?
 ### Assistant:
@@ -92,7 +92,7 @@ Question: Is there any info related to ""{question}"" in the context? Yes or no?
     answerable = llm(question_check_prompt)
     print(Fore.GREEN + Style.BRIGHT + answerable + Style.RESET_ALL)
     if "yes" in answerable.lower():
-        return "Yes", context, question
+        return "Yes", qa_prompt
     else:
         return " No"
  
@@ -109,7 +109,7 @@ def load_tools(llm_model):
         documents = load_unstructured_document(file_path)
 
         # Split documents into chunks
-        documents = split_documents(documents, chunk_size=100, chunk_overlap=20)
+        documents = split_documents(documents, chunk_size=500, chunk_overlap=20)
 
         # Determine the embedding model to use
         EmbeddingsModel = EMBEDDINGS_MAP.get(EMBEDDINGS_MODEL)
@@ -133,17 +133,7 @@ def load_tools(llm_model):
     retriever, title = ingest_file(file_path)
 
     def searchChroma(key_word):
-    # First, check if the question can be answered with the given context
-        #check_result = checkQuestion(key_word, retriever)
-        #print(Fore.GREEN + Style.BRIGHT + check_result + Style.RESET_ALL)
-        #if check_result.lower() != "yes":
-        #    print("The question cannot be answered with the given context.")
-        #    return
-        QUESTION_QA_PROMPT_TEMPLATE = """### Human: You are an helpful assistant that tries to answer questions concisely and precisely. Your answer must ONLY be based on the context information provided.
-        Context:{context}
-        Question: {question}
-        ### Assistant:"""
-        ##qa_prompt = QUESTION_QA_PROMPT_TEMPLATE.format(context=context, question=question)
+        print(Fore.GREEN + Style.BRIGHT + qa_prompt + Style.RESET_ALL)
         qa = llm(qa_prompt)
         # qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever, return_source_documents=False)
 

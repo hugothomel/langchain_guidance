@@ -16,6 +16,8 @@ from colorama import Fore, Style
 import uvicorn
 import nest_asyncio
 import asyncio
+from dotenv import load_dotenv
+
 class Question(BaseModel):
     question: Optional[str] = 'Who is the main character?'
 
@@ -30,7 +32,7 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-MODEL_PATH = MODEL
+MODEL_PATH = os.environ.get('MODEL_PATH')
 DEVICE = torch.device('cuda:0')
 
 llama = None
@@ -41,7 +43,7 @@ async def load_model():
     print(Fore.GREEN + Style.BRIGHT + f"Loading model...." + Style.RESET_ALL)
     global llama
     llama = guidance.llms.LlamaCpp(
-    model = "/home/karajan/labzone/llama.cpp/models/guanaco/guanaco-7B.ggmlv3.q8_0.bin",
+    model = MODEL_PATH,
     tokenizer="TheBloke/guanaco-7B-HF",
     n_gpu_layers=300,
     n_threads=12,
