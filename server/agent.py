@@ -21,8 +21,7 @@ CHROMA_SETTINGS = Settings(
 valid_answers = ['Action', 'Final Answer', 'Failed Check']
 valid_tools = ['Chroma Search', 'Check Question']
 
-prompt_start_template = """{{#system~}}
-You are a helpful and terse assistant.
+prompt_start_template = """### Human:
 Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
 
 Answer the following questions as best you can. You have access to the following tools:
@@ -62,37 +61,25 @@ Action Input: How old is Anupama Nadella?
 Observation: Anupama Nadella's age is 50.
 Thought: I now know the final answer.
 Final Answer: Anupama Nadella is 50 years old.
-{{~/system}}
 
-{{#user~}}
-I want a response to the following question:
 {{question}}
-{{~/user}}
 
-{{#assistant~}}
 ### Assistant:
 Question: {{question}}
-Thought: {{gen 't1' stop='\\n'}}
-{{~/assistant}}
-{{#select 'answer'}}Action{{or}}Final Answer{{/select}}: """
+Thought: {{gen 't1' temperature=0 stop='\\n'}}
+{{select 'answer' logprobs='logprobs' options=valid_answers}}: """
 
-prompt_mid_template = """{{history}}{{#select 'tool_name'}}Chroma Search{{or}}Check Question{{/select}}
-{{#assistant~}}
-Action Input: {{gen 'actInput' stop='\\n'}}
+prompt_mid_template = """{{history}}{{select 'tool_name' options=valid_tools}}
+Action Input: {{gen 'actInput' temperature=0 stop='\\n'}}
 Observation: {{do_tool tool_name actInput}}
 Thought: {{gen 'thought' stop='\\n'}}
-{{~/assistant}}
-{{#select 'answer' logprobs='logprobs'}}Action{{or}}Final Answer{{/select}}:"""
+{{select 'answer' logprobs='logprobs' options=valid_answers}}: """
 
-prompt_final_template = """{{history}}{{#select 'tool_name'}}Chroma Search{{or}}Check Question{{/select}}
-{{#assistant~}}
-Action Input: {{gen 'actInput' stop='\\n'}}
+prompt_final_template = """{{history}}{{select 'tool_name' options=valid_tools}}
+Action Input: {{gen 'actInput' temperature=0 stop='\\n'}}
 Observation: {{do_tool tool_name actInput}}
-Thought: {{gen 'thought' stop='\\n'}}
-{{~/assistant}}
-{{#select 'answer'}}Action{{or}}Final Answer{{/select}}: {{gen 'fn' stop='\\n'}}
-
-"""
+Thought: {{gen 'thought' temperature=0 stop='\\n'}}
+{{select 'answer' options=valid_answers}}: {{gen 'fn' stop='\\n'}}"""
 
 class CustomAgentGuidance:
     def __init__(self, guidance, tools, num_iter=3):
@@ -137,3 +124,4 @@ class CustomAgentGuidance:
             result_final = prompt_mid()
 
         return result_final
+
