@@ -51,7 +51,7 @@ def load_unstructured_document(document: str) -> list[Document]:
     title = os.path.basename(document)
     return [Document(page_content=text, metadata={"title": title})]
 
-def split_documents(documents: list[Document], chunk_size: int = 500, chunk_overlap: int = 20) -> list[Document]:
+def split_documents(documents: list[Document], chunk_size: int = 120, chunk_overlap: int = 20) -> list[Document]:
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     return text_splitter.split_documents(documents)
 
@@ -109,7 +109,7 @@ def load_tools(llm_model):
         documents = load_unstructured_document(file_path)
 
         # Split documents into chunks
-        documents = split_documents(documents, chunk_size=500, chunk_overlap=20)
+        documents = split_documents(documents, chunk_size=120, chunk_overlap=20)
 
         # Determine the embedding model to use
         EmbeddingsModel = EMBEDDINGS_MAP.get(EMBEDDINGS_MODEL)
