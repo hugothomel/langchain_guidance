@@ -21,9 +21,9 @@ CHROMA_SETTINGS = Settings(
 valid_answers = ['Action', 'Final Answer', 'Failed Check']
 valid_tools = ['Chroma Search', 'Check Question']
 
-prompt_start_template = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
+prompt_start_template = """### Human:
+Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
 
-### Instruction:
 Answer the following questions as best you can. You have access to the following tools:
 
 Check Question: A tool to validate if a question is answerable or not. The input is the question to validate.
@@ -62,27 +62,69 @@ Observation: Anupama Nadella's age is 50.
 Thought: I now know the final answer.
 Final Answer: Anupama Nadella is 50 years old.
 
-### Input:
 {{question}}
 
-### Response:
+### Assistant:
 Question: {{question}}
-Thought: {{gen 't1' stop='\\n'}}
+Thought: {{gen 't1' temperature=0 stop='\\n'}}
 {{select 'answer' logprobs='logprobs' options=valid_answers}}: """
 
 prompt_mid_template = """{{history}}{{select 'tool_name' options=valid_tools}}
-Action Input: {{gen 'actInput' stop='\\n'}}
+Action Input: {{gen 'actInput' temperature=0 stop='\\n'}}
 Observation: {{do_tool tool_name actInput}}
 Thought: {{gen 'thought' stop='\\n'}}
 {{select 'answer' logprobs='logprobs' options=valid_answers}}: """
 
 prompt_final_template = """{{history}}{{select 'tool_name' options=valid_tools}}
-Action Input: {{gen 'actInput' stop='\\n'}}
+Action Input: {{gen 'actInput' temperature=0 stop='\\n'}}
 Observation: {{do_tool tool_name actInput}}
-Thought: {{gen 'thought' stop='\\n'}}
+Thought: {{gen 'thought' temperature=0 stop='\\n'}}
 {{select 'answer' options=valid_answers}}: {{gen 'fn' stop='\\n'}}"""
 
 class CustomAgentGuidance:
+    def __init__(self, guidance, tools, num_iter=3):
+        self.guidance = guidance
+        self.tools = tools
+        self.num_iter = num_iter
+
+    def do_tool(self, tool_name, actInput):
+        print(Fore.GREEN + Style.BRIGHT + f"Using tool: {tool_name}" + Style.RESET_ALL)
+        result = self.tools[tool_name](actInput)
+        print(result)
+        return result
+            
+    def __call__(self, query):
+        prompt_start = self.guidance(prompt_start_template)
+        result_start = prompt_start(question=query, valid_answers=valid_answers)
+        result_mid = result_start
+
+        for _ in range(self.num_iter - 1):
+            if result_mid['answer'] == 'Final Answer':
+                break
+            history = result_mid.__str__()
+            prompt_mid = self.guidance(prompt_mid_template)
+            result_mid = prompt_mid(history=history, do_tool=self.do_tool, valid_answers=valid_answers, valid_tools=valid_tools)
+            print(Fore.YELLOW + Style.BRIGHT + str(result_mid) + Style.RESET_ALL)
+            if "Observation:  No" in str(result_mid):
+                print(Fore.RED + Style.BRIGHT + f"I don't know" + Style.RESET_ALL)
+                break
+            
+        if "Observation:  No" in str(result_mid):
+            result_final = "I can't say"
+            #result_final = prompt_mid(history="I cannot answer this question given the context", do_tool=self.do_tool, valid_answers=['Final Answer'], valid_tools=valid_tools)
+
+        elif result_mid['answer'] != 'Final Answer':
+            history = result_mid.__str__()
+            prompt_mid = self.guidance(prompt_final_template)
+            result_final = prompt_mid(history=history, do_tool=self.do_tool, valid_answers=['Final Answer'], valid_tools=valid_tools)
+
+        else:
+            history = result_mid.__str__()
+            prompt_mid = self.guidance(history + "{{gen 'fn' stop='\\n'}}")
+            result_final = prompt_mid()
+
+        return result_final
+
     def __init__(self, guidance, tools, num_iter=3):
         self.guidance = guidance
         self.tools = tools

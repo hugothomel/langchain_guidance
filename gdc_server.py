@@ -1,6 +1,4 @@
 from importlib import reload
-import sacremoses
-from transformers import FlaubertModel, FlaubertTokenizer
 import server.tools
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,7 +40,12 @@ dict_tools = None
 async def load_model():
     print(Fore.GREEN + Style.BRIGHT + f"Loading model...." + Style.RESET_ALL)
     global llama
-    llama = guidance.llms.Transformers(MODEL_PATH, device_map="auto", load_in_8bit=True)
+    llama = guidance.llms.LlamaCpp(
+    model = "/home/karajan/labzone/llama.cpp/models/guanaco/guanaco-7B.ggmlv3.q8_0.bin",
+    tokenizer="TheBloke/guanaco-7B-HF",
+    n_gpu_layers=300,
+    n_threads=12,
+    caching=False, )
     guidance.llm = llama
     return 'Model loaded successfully'
 
