@@ -37,7 +37,7 @@ qa_prompt = ""
 CHROMA_SETTINGS = {}  # Set your Chroma settings here
 
 def clean_text(text):
-    # Remove line breaks
+    # Remove line breaksRetrievalQA
     text = text.replace('\n', ' ')
 
     # Remove special characters
@@ -55,54 +55,37 @@ def split_documents(documents: list[Document], chunk_size: int = 120, chunk_over
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     return text_splitter.split_documents(documents)
 
-
-def checkQuestion(question: str, retriever, llm):
-    global qa_prompt
-    QUESTION_CHECK_PROMPT_TEMPLATE = """### Human: You are an AI assistant who uses document information to answer questions. You MUST answer with 'yes' or 'no'. Given the following pieces of context, determine if there are any elements related to the question in the context.
-Don't forget you MUST answer with 'yes' or 'no'. To assist me in this task, you have access to a vector database context that contains various documents related to different topics.
-Context:{context}
-Question: Is there any info related to ""{question}"" in the context? Yes or no?
-### Assistant:
-"""
-    QUESTION_QA_PROMPT_TEMPLATE = """### Human: You are an helpful assistant that tries to answer questions concisely and precisely. Your answer must ONLY be based on the context information provided.
-    Context:{context}
-    Question: {question}
-    ### Assistant:
-"""
-    qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever, return_source_documents=True)
-    # Answer the question
-    answer_data = qa({"query": question})
-
-    # Check if 'answer' is in answer_data, if not print it in bold red
-    if 'result' not in answer_data:
-        print(f"\033[1;31m{answer_data}\033[0m")
-        return "Issue in retrieving the answer."
-
-    answer = answer_data['result']
-    context_documents = answer_data['source_documents']
-
-    # Combine all contexts into one
-    context = " ".join([clean_text(doc.page_content) for doc in context_documents])
-    # Formulate the prompt for the LLM
-    question_check_prompt = QUESTION_CHECK_PROMPT_TEMPLATE.format(context=context, question=question)
-    qa_prompt = QUESTION_QA_PROMPT_TEMPLATE.format(context=context, question=question)
-
-    print(Fore.GREEN + Style.BRIGHT + question_check_prompt + Style.RESET_ALL)
-    # Submit the prompt to the LLM directly
-    answerable = llm(question_check_prompt)
-    print(Fore.GREEN + Style.BRIGHT + answerable + Style.RESET_ALL)
-    if "yes" in answerable.lower():
-        return "Yes", qa_prompt
-    else:
-        return " No"
  
 
+def ingest_file(file_path):
+        # Load unstructured document
+        documents = load_unstructured_document(file_path)
+
+        # Split documents into chunks
+        documents = split_documents(documents, chunk_size=120, chunk_overlap=20)
+
+        # Determine the embedding model to use
+        EmbeddingsModel = EMBEDDINGS_MAP.get(EMBEDDINGS_MODEL)
+        if EmbeddingsModel is None:
+            raise ValueError(f"Invalid embeddings model: {EMBEDDINGS_MODEL}")
+
+        model_kwargs = {"device": "cuda:0"} if EmbeddingsModel == HuggingFaceInstructEmbeddings else {}
+        embedding = EmbeddingsModel(model_name=EMBEDDINGS_MODEL, model_kwargs=model_kwargs)
+
+        # Store embeddings from the chunked documents
+        vectordb = Chroma.from_documents(documents=documents, embedding=embedding)
+
+        retriever = vectordb.as_retriever(search_kwargs={"k":4})
+
+        print(file_path)
+        print(retriever)
+
+        return retriever
 
 
 
-def load_tools(llm_model):
-    
-    llm = LlamaCpp(model_path=model_path, n_ctx=model_n_ctx, callbacks=callbacks, verbose=False,n_gpu_layers=n_gpu_layers, use_mlock=use_mlock,top_p=0.9, n_batch=n_batch)
+def load_tools():  
+    #llm = LlamaCpp(model_path=model_path, n_ctx=model_n_ctx, callbacks=callbacks, verbose=False,n_gpu_layers=n_gpu_layers, use_mlock=use_mlock,top_p=0.9, n_batch=n_batch)
 
     def ingest_file(file_path):
         # Load unstructured document
@@ -132,21 +115,9 @@ def load_tools(llm_model):
     file_path = TEST_FILE
     retriever, title = ingest_file(file_path)
 
-    def searchChroma(key_word):
-        print(Fore.GREEN + Style.BRIGHT + qa_prompt + Style.RESET_ALL)
-        qa = llm(qa_prompt)
-        # qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever, return_source_documents=False)
-
-        print(qa)
-        #res = qa.run(key_word)
-        #print(res)
-        #return res
-        return qa
 
     dict_tools = {
-        'Chroma Search': searchChroma,
         'File Ingestion': ingest_file,
-        'Check Question': lambda question: checkQuestion(question, retriever, llm),
     }
 
     return dict_tools

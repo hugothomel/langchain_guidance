@@ -1,127 +1,128 @@
-# import the necessary libraries
 from dotenv import load_dotenv
 import os
 from chromadb.config import Settings
 from colorama import Fore, Style
+from server.tools import load_tools 
+from langchain.chains import RetrievalQA
+from server.tools import clean_text
+from server.tools import ingest_file
+from langchain.llms import LlamaCpp
 
-# load the environment variables
 load_dotenv()
 
-# get the environment variables
 TEST_FILE = os.getenv("TEST_FILE")
 
 EMBEDDINGS_MODEL_NAME = os.getenv('EMBEDDINGS_MODEL')
 PERSIST_DIRECTORY = os.getenv('MEMORIES_PATH')
 CHROMA_SETTINGS = Settings(
-        chroma_db_impl='duckdb+parquet',
-        persist_directory=PERSIST_DIRECTORY,
-        anonymized_telemetry=False
+    chroma_db_impl='duckdb+parquet',
+    persist_directory=PERSIST_DIRECTORY,
+    anonymized_telemetry=False
 )
 
-valid_answers = ['Action', 'Final Answer', 'Failed Check']
-valid_tools = ['Chroma Search', 'Check Question']
 
-prompt_start_template = """### Human:
-Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
-
-Answer the following questions as best you can. You have access to the following tools:
-
-Check Question: A tool to validate if a question is answerable or not. The input is the question to validate.
-
-Chroma Search: A wrapper around Chroma Search. Useful for when you need to answer questions about current events. The input is the question to search relevant information.
-
-Strictly use the following format:
-
-Question: the input question you must answer
-Thought: you should always think about what to do
-Action: the action to take, should be one of [Check Question, Chroma Search]
-Action Input: the input to the action, should be a question.
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question
-
-For examples:
-Question: How old is the CEO of Microsoft's wife?
-Thought: First, I need to check if the question is answerable.
-Action: Check Question
-Action Input: How old is the CEO of Microsoft's wife?
-Observation: The question is answerable.
-Thought: Now, I need to find who is the CEO of Microsoft.
-Action: Chroma Search
-Action Input: Who is the CEO of Microsoft?
-Observation: Satya Nadella is the CEO of Microsoft.
-Thought: Now, I should find out Satya Nadella's wife.
-Action: Chroma Search
-Action Input: Who is Satya Nadella's wife?
-Observation: Satya Nadella's wife's name is Anupama Nadella.
-Thought: Then, I need to check Anupama Nadella's age.
-Action: Chroma Search
-Action Input: How old is Anupama Nadella?
-Observation: Anupama Nadella's age is 50.
-Thought: I now know the final answer.
-Final Answer: Anupama Nadella is 50 years old.
-
-{{question}}
-
-### Assistant:
-Question: {{question}}
-Thought: {{gen 't1' temperature=0 stop='\\n'}}
-{{select 'answer' logprobs='logprobs' options=valid_answers}}: """
-
-prompt_mid_template = """{{history}}{{select 'tool_name' options=valid_tools}}
-Action Input: {{gen 'actInput' temperature=0 stop='\\n'}}
-Observation: {{do_tool tool_name actInput}}
-Thought: {{gen 'thought' stop='\\n'}}
-{{select 'answer' logprobs='logprobs' options=valid_answers}}: """
-
-prompt_final_template = """{{history}}{{select 'tool_name' options=valid_tools}}
-Action Input: {{gen 'actInput' temperature=0 stop='\\n'}}
-Observation: {{do_tool tool_name actInput}}
-Thought: {{gen 'thought' temperature=0 stop='\\n'}}
-{{select 'answer' options=valid_answers}}: {{gen 'fn' stop='\\n'}}"""
-
+model_type = os.environ.get('MODEL_TYPE')
+model_path = os.environ.get('MODEL_PATH')
+model_n_ctx =1000
+target_source_chunks = os.environ.get('TARGET_SOURCE_CHUNKS')
+n_gpu_layers = os.environ.get('N_GPU_LAYERS')
+use_mlock = os.environ.get('USE_MLOCK')
+n_batch = os.environ.get('N_BATCH') if os.environ.get('N_BATCH') != None else 512
+callbacks = []
+qa_prompt = ""
+llm = LlamaCpp(model_path=model_path, n_ctx=model_n_ctx, callbacks=callbacks, verbose=False,n_gpu_layers=n_gpu_layers, use_mlock=use_mlock,top_p=0.9, n_batch=n_batch)
+valid_answers = ['Action', 'Final Answer']
+valid_tools = ["Check Question", "Google Search"]
+tools = load_tools()
 class CustomAgentGuidance:
-    def __init__(self, guidance, tools, num_iter=3):
+    def __init__(self, guidance, retriever, num_iter=3):
         self.guidance = guidance
-        self.tools = tools
+        self.retriever = ingest_file(TEST_FILE)
+        self.llm = llm
+
         self.num_iter = num_iter
+        self.prompt_template = """
+        {{#system~}}
+        Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
+        ### Instruction:
+        Answer the following questions as best you can. You have access to the following tools:
+        Google Search: A wrapper around Google Search. Useful for when you need to answer questions about current events. The input is the question to search relevant information.
+        {{~/system}}
 
-    def do_tool(self, tool_name, actInput):
-        print(Fore.GREEN + Style.BRIGHT + f"Using tool: {tool_name}" + Style.RESET_ALL)
-        result = self.tools[tool_name](actInput)
-        print(result)
-        return result
-            
-    def __call__(self, query):
-        prompt_start = self.guidance(prompt_start_template)
-        result_start = prompt_start(question=query, valid_answers=valid_answers)
-        result_mid = result_start
+        {{#user~}}
+        Question: {{question}}
+        {{~/user}}
 
-        for _ in range(self.num_iter - 1):
-            if result_mid['answer'] == 'Final Answer':
-                break
-            history = result_mid.__str__()
-            prompt_mid = self.guidance(prompt_mid_template)
-            result_mid = prompt_mid(history=history, do_tool=self.do_tool, valid_answers=valid_answers, valid_tools=valid_tools)
-            print(Fore.YELLOW + Style.BRIGHT + str(result_mid) + Style.RESET_ALL)
-            if "Observation:  No" in str(result_mid):
-                print(Fore.RED + Style.BRIGHT + f"I don't know" + Style.RESET_ALL)
-                break
-            
-        if "Observation:  No" in str(result_mid):
-            result_final = "I can't say"
-            #result_final = prompt_mid(history="I cannot answer this question given the context", do_tool=self.do_tool, valid_answers=['Final Answer'], valid_tools=valid_tools)
+        {{#assistant~}}
+        Thought: Let's first check our database.
+        Action: Check Question
+        Action Input: {{question}}
+        {{~/assistant}}
 
-        elif result_mid['answer'] != 'Final Answer':
-            history = result_mid.__str__()
-            prompt_mid = self.guidance(prompt_final_template)
-            result_final = prompt_mid(history=history, do_tool=self.do_tool, valid_answers=['Final Answer'], valid_tools=valid_tools)
+        {{#user~}}
+        Here are the relevant documents from our database:{{search question}}
+        {{~/user}}address?
 
+        {{#assistant~}}
+        Observation: Based on the documents, I think I can reach a conclusion.
+        {{#if (can_answer)}} 
+        Thought: I believe I can answer the question based on the information contained in the returned documents.
+        Final Answer: {{gen 'answer' temperature=0.7 max_tokens=500}}
+        {{else}}
+        Thought: I don't think I can answer the question based on the information contained in the returned documents.
+        Final Answer: I'm sorry, but I don't have sufficient information to provide an answer to this question.
+        {{/if}}
+
+        {{~/assistant}}
+        """
+
+    def searchQA(self, t):    
+        return self.checkQuestion(self.question)
+
+    def checkQuestion(self, question: str):
+        question = question.replace("Action Input: ", "")
+        qa = RetrievalQA.from_chain_type(llm=self.llm, chain_type="stuff", retriever=self.retriever, return_source_documents=True)
+        answer_data = qa({"query": question})
+
+        if 'result' not in answer_data:
+            print(f"\033[1;31m{answer_data}\033[0m")
+            return "Issue in retrieving the answer."
+
+        context_documents = answer_data['source_documents']
+        context = " ".join([clean_text(doc.page_content) for doc in context_documents])
+        return context
+
+    def can_answer(self, question: str):
+        question = question.replace("Action Input: ", "")
+        qa = RetrievalQA.from_chain_type(llm=self.llm, chain_type="stuff", retriever=self.retriever, return_source_documents=True)
+        answer_data = qa({"query": question})
+
+        if 'result' not in answer_data:
+            print(f"\033[1;31m{answer_data}\033[0m")
+            return "Issue in retrieving the answer."
+
+        answer = answer_data['result']
+        context_documents = answer_data['source_documents']
+        context = " ".join([clean_text(doc.page_content) for doc in context_documents])
+
+        question_check_prompt = """###Instruction: You are an AI assistant who uses document information to answer questions. Given the following pieces of context, determine if there are any elements related to the question in the context. To assist me in this task, you have access to a vector database context that contains various documents related to different topics.Don't forget you MUST answer with 'yes' or 'no'
+ 
+        Context:{context}
+        Question: Do you think it would be possible to infer an answer to this question: ""{question}"" from the provided context? You MUST include'yes' or 'no' in your answer.
+        ### Response:
+        """.format(context=context, question=question)
+        
+        print(Fore.GREEN + Style.BRIGHT + question_check_prompt + Style.RESET_ALL)
+        answerable = self.llm(question_check_prompt)
+        print(Fore.RED + Style.BRIGHT + context + Style.RESET_ALL)
+        print(Fore.RED + Style.BRIGHT + answerable + Style.RESET_ALL)
+        if "yes" in answerable.lower():
+            return True
         else:
-            history = result_mid.__str__()
-            prompt_mid = self.guidance(history + "{{gen 'fn' stop='\\n'}}")
-            result_final = prompt_mid()
+            return False
 
-        return result_final
-
+    def __call__(self, question):
+        self.question = question
+        prompt = self.guidance(self.prompt_template)
+        result = prompt(question=question, search=self.searchQA, can_answer=self.can_answer(question),valid_answers=valid_answers, valid_tools=valid_tools)
+        return result
