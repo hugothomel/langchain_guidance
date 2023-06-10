@@ -22,7 +22,7 @@ CHROMA_SETTINGS = Settings(
 
 
 model_type = "os.environ.get('MODEL_TYPE')"
-model_path ="/home/karajan/Downloads/Wizard-Vicuna-30B-Uncensored.ggmlv3.q4_0.bin"
+model_path ="/home/karajan/Downloads/airoboros-13b-gpt4.ggmlv3.q8_0.bin"
 model_n_ctx =1000
 target_source_chunks = os.environ.get('TARGET_SOURCE_CHUNKS')
 n_gpu_layers = os.environ.get('N_GPU_LAYERS')
@@ -105,10 +105,10 @@ class CustomAgentGuidance:
         context_documents = answer_data['source_documents']
         context = " ".join([clean_text(doc.page_content) for doc in context_documents])
 
-        question_check_prompt = """###Instruction: You are an AI assistant who uses document information to answer questions. Given the following pieces of context, determine if there are any elements related to the question in the context. To assist me in this task, you have access to a vector database context that contains various documents related to different topics.Don't forget you MUST answer with 'yes' or 'no'
+        question_check_prompt = """###Instruction: You are an AI assistant who uses document information to answer questions. For each query, your database returns you documents that might or might include relevant elements to the query. Don't forget you MUST answer with 'yes' or 'no'
  
-        Context:{context}
-        Question: Do you think it would be possible to infer an answer to this question: ""{question}"" from the provided context ONLY? You MUST include'yes' or 'no' in your answer.
+        Documents:{context}
+        Given the documents listed, can you determine an answer to the following question based solely on the provided information: ""{question}"" Note that your response MUST contain either 'yes' or 'no'.
         ### Response:
         """.format(context=context, question=question)
         
