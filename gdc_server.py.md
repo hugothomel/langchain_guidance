@@ -1,96 +1,185 @@
-## Internal Code Documentation: Server Application 
+## Internal Code Documentation: Server API 
 
-### Table of Contents
+**Table of Contents** 
 
-* [**Introduction**](#introduction)
-* [**Module Imports and Initializations**](#module-imports-and-initializations)
-* [**Flask App Configuration**](#flask-app-configuration)
-* [**Model Loading Route**](#model-loading-route)
-* [**Tools Loading Route**](#tools-loading-route)
-* [**Run Script Route**](#run-script-route)
-* [**Reload Modules Route**](#reload-modules-route)
-* [**Main Function**](#main-function)
+* [Introduction](#introduction)
+* [Code Overview](#code-overview)
+* [Endpoints](#endpoints)
+    * [/load_model](#load_model)
+    * [/load_tools](#load_tools)
+    * [/run_script](#run_script)
+    * [/reload_modules](#reload_modules)
+* [Helper Functions & Classes](#helper-functions--classes)
+    * [CustomAgentGuidance](#customagentguidance) 
+* [Notes](#notes)
 
+### Introduction
 
-### Introduction 
+This document outlines the internal code documentation for the server API. This API provides endpoints to interact with a large language model (LLM) and a set of tools.  The API is designed to allow users to:
 
-This Python code implements a Flask server application designed for running a custom agent using Guidance and a large language model (LLM). The server provides functionalities for loading the model, tools, and executing scripts based on user input.
+* **Load the LLM model:**  This endpoint is used to initialize the LLM model and make it available for use.
+* **Load tools:** This endpoint is used to load and make available a set of tools for the LLM to use.
+* **Run a script:** This endpoint allows users to submit a question or instruction to the LLM, which will then utilize the loaded tools to generate a response.
+* **Reload Modules:** This endpoint allows users to reload the server's modules, potentially updating them with new code.
 
-### Module Imports and Initializations
+### Code Overview
 
-The code begins by importing necessary modules:
+The server API is built using the Flask framework.  The code leverages several external libraries, including:
 
-| Module | Description |
-|---|---|
-| `importlib` | Provides the `reload` function for reloading modules. |
-| `server.tools` | Contains custom tools for the agent. |
-| `flask` | The web framework for building the server. |
-| `flask_cors` | Enables cross-origin requests. |
-| `constants` | Defines constants used throughout the code. |
-| `nest_asyncio` | Allows asynchronous operations within Flask. |
-| `guidance` | The library for creating and running custom agents. |
-| `torch` |  The deep learning framework for handling the model. |
-| `server.model` | Contains the model loading function. |
-| `server.agent` | Contains the custom agent class. |
-| `os` | Provides operating system functionalities. |
-| `langchain.llms` |  Provides the `OpenAI` class for accessing OpenAI LLMs. |
-| `colorama` | Used for colored console output. |
+* **Flask**:  Web framework for building the API.
+* **Flask-CORS**:  Enables Cross-Origin Resource Sharing (CORS) to allow requests from different origins.
+* **guidance**:  Library for interacting with LLMs and tools.
+* **torch**:  PyTorch library for handling the LLM model.
+* **langchain.llms**:  Library for interacting with LLMs. 
+* **colorama**:  Library for adding color to console output.
 
-The code then initializes the Flask application and applies `nest_asyncio` for asynchronous operations. It also defines variables for the model path (`MODEL_PATH`) and the device (`DEVICE`).
+### Endpoints
 
-Global variables `llama` and `dict_tools` are initialized as `None`. These variables will store the loaded LLM and tools respectively.
+#### `/load_model`
 
-### Flask App Configuration
+**Method:** POST
 
-The code configures the Flask application by:
+**Description:** 
 
-* Enabling CORS to allow cross-origin requests.
-* Setting the `debug` flag to `False` to disable debug mode in production.
+This endpoint loads the LLM model. 
 
-### Model Loading Route
+* **Request Body:** None
 
-The `/load_model` route handles the loading of the LLM model:
+* **Response:** 
+    * **200 OK:** "Model loaded successfully"
+    * **400 Bad Request:**  (If model loading fails)
 
-* It takes a POST request.
-* Loads the LLM model from `MODEL_PATH` using `guidance.llms.Transformers` and sets the `device_map` to "auto" for automatic device allocation. 
-* Sets `load_in_8bit` to `True` to optimize memory usage.
-* Assigns the loaded LLM to the global variable `llama` and updates `guidance.llm` with the loaded model.
-* Returns a success message.
+**Code:**
 
-### Tools Loading Route
+```python
+@app.route('/load_model', methods=['POST'])
+@cross_origin()
+def load_model():
+    print(Fore.GREEN + Style.BRIGHT + f"Loading model...." + Style.RESET_ALL)
+    global llama
+    llama = guidance.llms.Transformers(MODEL_PATH, device_map="auto", load_in_8bit=True)
+    guidance.llm = llama
+    return 'Model loaded successfully'
+```
 
-The `/load_tools` route handles the loading of the tools:
+#### `/load_tools`
 
-* It takes a POST request.
-* Checks if the LLM has been loaded. If not, it returns an error message.
-* Reloads the `server.tools` module using `reload` to ensure the latest version is loaded.
-* Loads the tools using `load_tools(llama)` from `server.tools` and assigns them to the global variable `dict_tools`.
-* Returns a success message.
+**Method:** POST
 
-### Run Script Route
+**Description:** 
 
-The `/run_script` route handles execution of scripts with the loaded tools and LLM:
+This endpoint loads the set of tools that the LLM will use.
 
-* It takes a POST request.
-* Checks if the tools have been loaded. If not, it returns an error message.
-* Retrieves the user's question from the request.
-* Creates a `CustomAgentGuidance` object with the loaded tools and guidance.
-* Executes the agent with the user's question and retrieves the final answer.
-* Returns the final answer and the function name used to generate the answer.
+* **Request Body:** None
 
-### Reload Modules Route
+* **Response:** 
+    * **200 OK:** "Tools loaded successfully"
+    * **400 Bad Request:**  "Model is not loaded. Load the model first" (If the model has not been loaded yet)
 
-The `/reload_modules` route handles reloading of all relevant modules:
+**Code:**
 
-* It takes a POST request.
-* Reloads the `server.tools`, `server.agent`, and `server.model` modules using `reload`.
-* Re-imports functions and classes from the reloaded modules.
-* Returns a success message.
+```python
+@app.route('/load_tools', methods=['POST'])
+@cross_origin()
+def load_tools_route():
+    global dict_tools
+    # Reload the tools module to get the latest version
+    reload(server.tools)
 
-### Main Function
+    if llama is None:
+        return 'Model is not loaded. Load the model first', 400
+    dict_tools = load_tools(llama)
+    return 'Tools loaded successfully' 
+```
 
-The main function starts the Flask application:
+#### `/run_script`
 
-* It runs the Flask app on host `0.0.0.0`, port `5001`, and with `debug` mode set to `False`. 
+**Method:** POST
 
-This allows the server to listen for requests on all available interfaces and run without the debug mode enabled.
+**Description:** 
+
+This endpoint allows users to submit a question or instruction to the LLM.  The LLM will then use the loaded tools to generate a response.
+
+* **Request Body:** 
+    * **question:** (string) The question or instruction to be processed by the LLM.
+
+* **Response:** 
+    * **200 OK:** 
+        * **final_answer:** (string) The response generated by the LLM.
+        * **fn:** (string) The name of the tool used to generate the response.
+    * **400 Bad Request:**  "Tools are not loaded. Load the tools first" (If the tools have not been loaded yet)
+
+**Code:**
+
+```python
+@app.route('/run_script', methods=['POST'])
+@cross_origin()
+def run_script():
+    global dict_tools
+    if dict_tools is None:
+        return 'Tools are not loaded. Load the tools first', 400
+    question = request.json.get('question', 'Who is the main character?')
+    custom_agent = CustomAgentGuidance(guidance, dict_tools)
+    final_answer = custom_agent(question)
+    return str(final_answer), str(final_answer['fn'])
+```
+
+#### `/reload_modules`
+
+**Method:** POST
+
+**Description:** 
+
+This endpoint reloads the server's modules.  This can be useful for updating the server with new code.
+
+* **Request Body:** None
+
+* **Response:** 
+    * **200 OK:** "Modules reloaded successfully"
+
+**Code:**
+
+```python
+@app.route('/reload_modules', methods=['POST'])
+@cross_origin()
+def reload_modules():
+    global server
+    # Reload the modules
+    server.tools = reload(server.tools)
+    server.agent = reload(server.agent)
+    server.model = reload(server.model)
+
+    # Re-import functions or classes
+    from server.tools import load_tools
+    from server.model import load_model_main
+    from server.agent import CustomAgentGuidance
+    print(Fore.GREEN + Style.BRIGHT + f"Modules reloaded successfully" + Style.RESET_ALL)
+    return 'Modules reloaded successfully'
+```
+
+### Helper Functions & Classes
+
+#### `CustomAgentGuidance`
+
+**Description:**
+
+This class represents a custom agent that utilizes the `guidance` library and a set of tools.  The agent is responsible for handling user input, interacting with the LLM and tools, and generating responses.
+
+**Code:**
+
+```python
+class CustomAgentGuidance(guidance.Agent):
+    def __init__(self, guidance, tools):
+        super().__init__(guidance, tools=tools)
+        self.guidance = guidance
+        self.tools = tools
+```
+
+### Notes
+
+* The code uses `global` variables to store references to the LLM (`llama`) and the loaded tools (`dict_tools`). This allows these variables to be accessed and modified from different parts of the code.
+* The `reload()` function is used to reload modules at runtime. This allows the server to update itself with new code without requiring a restart.
+* The code uses `colorama` to add color to console output. This can make it easier to identify different types of messages in the console. 
+* The `guidance` library is used for interacting with LLMs and tools.  This library provides a set of tools for working with LLMs, including a text generator, a code generator, and a summarizer.
+* The code uses `nest_asyncio` to enable asynchronous operations within the Flask application.
+* The `device_map="auto"` parameter in the `guidance.llms.Transformers` constructor allows the model to be loaded on the GPU if available.  The `load_in_8bit=True` parameter can be used to reduce memory usage during model loading.
